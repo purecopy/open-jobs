@@ -1,33 +1,35 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import dotenv from "dotenv";
-import { readFileSync } from "fs";
-import { resolve } from "path";
 
 dotenv.config();
 
 export interface Profile {
-  name: string;
-  location: { preferred: string[]; remote_ok: boolean };
-  roles: string[];
-  employment_type: string[];
-  languages: { spoken: string[]; scoring_note: string };
-  experience_summary: string;
-  strengths: string[];
   dealbreakers: string[];
+  employment_type: string[];
+  experience_summary: string;
+  languages: { spoken: string[]; scoring_note: string };
+  location: { preferred: string[]; remote_ok: boolean };
+  name: string;
   nice_to_have: string[];
+  roles: string[];
+  strengths: string[];
 }
 
 export interface Config {
   anthropicApiKey: string;
+  dbPath: string;
   firecrawlApiKey: string;
   perplexityApiKey: string;
-  dbPath: string;
-  relevanceThreshold: number;
   profile: Profile;
+  relevanceThreshold: number;
 }
 
 function requireEnv(name: string): string {
   const value = process.env[name];
-  if (!value) throw new Error(`Missing required env var: ${name}`);
+  if (!value) {
+    throw new Error(`Missing required env var: ${name}`);
+  }
   return value;
 }
 
@@ -46,7 +48,10 @@ export function getConfig(): Config {
       firecrawlApiKey: requireEnv("FIRECRAWL_API_KEY"),
       perplexityApiKey: requireEnv("PERPLEXITY_API_KEY"),
       dbPath: process.env.OPENCLAW_DB_PATH || "./openclaw.db",
-      relevanceThreshold: parseInt(process.env.RELEVANCE_THRESHOLD || "3", 10),
+      relevanceThreshold: Number.parseInt(
+        process.env.RELEVANCE_THRESHOLD || "3",
+        10
+      ),
       profile: loadProfile(),
     };
   }

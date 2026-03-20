@@ -2,8 +2,8 @@ import { getConfig } from "../config.js";
 import { getAllUrls } from "../db.js";
 
 interface PerplexityMessage {
-  role: string;
   content: string;
+  role: string;
 }
 
 interface PerplexityResponse {
@@ -23,7 +23,8 @@ export async function discoverJobs(): Promise<string[]> {
   const messages: PerplexityMessage[] = [
     {
       role: "system",
-      content: "You are a job search assistant. Find current, active job listings matching the query. Return the specific URLs to job postings, not general career pages.",
+      content:
+        "You are a job search assistant. Find current, active job listings matching the query. Return the specific URLs to job postings, not general career pages.",
     },
     { role: "user", content: query },
   ];
@@ -41,7 +42,9 @@ export async function discoverJobs(): Promise<string[]> {
   });
 
   if (!response.ok) {
-    throw new Error(`Perplexity API error: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `Perplexity API error: ${response.status} ${response.statusText}`
+    );
   }
 
   const data = (await response.json()) as PerplexityResponse;
@@ -70,7 +73,9 @@ export async function discoverJobs(): Promise<string[]> {
     // Skip generic pages
     try {
       const path = new URL(u).pathname.toLowerCase();
-      if (path === "/" || path === "") return false;
+      if (path === "/" || path === "") {
+        return false;
+      }
     } catch {
       return false;
     }

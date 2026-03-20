@@ -1,14 +1,20 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getConfig } from "./config.js";
-import { expireJobs, getUnscoredJobs, updateScore, suppressLowScoring } from "./db.js";
+import {
+  expireJobs,
+  getUnscoredJobs,
+  suppressLowScoring,
+  updateScore,
+} from "./db.js";
 
 const MODEL = "claude-sonnet-4-6-20250514";
+const JSON_ARRAY_RE = /\[[\s\S]*\]/;
 
 interface ScoredJob {
   id: number;
-  relevance_score: number;
-  relevance_reason: string;
   language_flag: "green" | "yellow" | "red";
+  relevance_reason: string;
+  relevance_score: number;
 }
 
 let _client: Anthropic | null = null;
@@ -46,7 +52,7 @@ export async function scoreJobs(): Promise<ScoreResult> {
   const jobsList = jobs
     .map(
       (j) =>
-        `[ID: ${j.id}] "${j.title}" at ${j.company} | Location: ${j.location} | Type: ${j.employment_type} | Language: ${j.language_required} | Description: ${j.description}`,
+        `[ID: ${j.id}] "${j.title}" at ${j.company} | Location: ${j.location} | Type: ${j.employment_type} | Language: ${j.language_required} | Description: ${j.description}`
     )
     .join("\n");
 
@@ -82,11 +88,14 @@ ${jobsList}`,
     ],
   });
 
-  const text = response.content[0]?.type === "text" ? response.content[0].text : "";
+  const text =
+    response.content[0]?.type === "text" ? response.content[0].text : "";
 
   try {
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) throw new Error("No JSON array in response");
+    const jsonMatch = text.match(JSON_ARRAY_RE);
+    if (!jsonMatch) {
+      throw new Error("No JSON array in response");
+    }
     const scored = JSON.parse(jsonMatch[0]) as ScoredJob[];
 
     for (const s of scored) {
@@ -97,7 +106,9 @@ ${jobsList}`,
 
     return { expired, scored: scored.length, suppressed };
   } catch (err) {
-    console.error(`  Failed to parse scoring response: ${err instanceof Error ? err.message : err}`);
+    console.error(
+      `  Failed to parse scoring response: ${err instanceof Error ? err.message : err}`
+    );
     return { expired, scored: 0, suppressed: 0 };
   }
 }

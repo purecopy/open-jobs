@@ -1,1 +1,16 @@
-{ "planDirectory": "./docs/plans" }
+{
+  "planDirectory": "./docs/plans",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "npm run fix -- --skip=correctness/noUnusedImports",
+            "type": "command"
+          }
+        ],
+        "matcher": "Write|Edit"
+      }
+    ]
+  }
+}

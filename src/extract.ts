@@ -3,19 +3,20 @@ import { getConfig } from "./config.js";
 import type { ScrapedPage } from "./crawl/firecrawl.js";
 
 const MODEL = "claude-sonnet-4-6-20250514";
+const JSON_ARRAY_RE = /\[[\s\S]*\]/;
 
 export interface RawJob {
-  title: string;
-  title_en: string;
   company: string;
-  url: string;
-  location: string;
+  deadline: string;
+  description: string;
   employment_type: string;
   language_required: string;
-  description: string;
-  salary: string;
-  deadline: string;
+  location: string;
   posted_at: string;
+  salary: string;
+  title: string;
+  title_en: string;
+  url: string;
 }
 
 let _client: Anthropic | null = null;
@@ -27,13 +28,20 @@ function getClient(): Anthropic {
   return _client;
 }
 
-export async function extractJobs(pages: ScrapedPage[], platform: string): Promise<RawJob[]> {
-  if (pages.length === 0) return [];
+export async function extractJobs(
+  pages: ScrapedPage[],
+  platform: string
+): Promise<RawJob[]> {
+  if (pages.length === 0) {
+    return [];
+  }
 
   const client = getClient();
 
   const pagesContent = pages
-    .map((p, i) => `--- Page ${i + 1}: ${p.url} ---\n${p.markdown.slice(0, 8000)}`)
+    .map(
+      (p, i) => `--- Page ${i + 1}: ${p.url} ---\n${p.markdown.slice(0, 8000)}`
+    )
     .join("\n\n");
 
   const response = await client.messages.create({
@@ -66,12 +74,15 @@ ${pagesContent}`,
     ],
   });
 
-  const text = response.content[0]?.type === "text" ? response.content[0].text : "";
+  const text =
+    response.content[0]?.type === "text" ? response.content[0].text : "";
 
   try {
     // Extract JSON array from response (may be wrapped in markdown code blocks)
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) return [];
+    const jsonMatch = text.match(JSON_ARRAY_RE);
+    if (!jsonMatch) {
+      return [];
+    }
     const jobs = JSON.parse(jsonMatch[0]) as RawJob[];
     // Ensure each job has a url fallback
     return jobs.map((job, i) => ({
@@ -79,7 +90,9 @@ ${pagesContent}`,
       url: job.url || pages[i]?.url || "",
     }));
   } catch (err) {
-    console.error(`  Failed to parse extraction response for ${platform}: ${err instanceof Error ? err.message : err}`);
+    console.error(
+      `  Failed to parse extraction response for ${platform}: ${err instanceof Error ? err.message : err}`
+    );
     return [];
   }
 }

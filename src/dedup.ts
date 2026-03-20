@@ -1,4 +1,4 @@
-import { createHash } from "crypto";
+import { createHash } from "node:crypto";
 import { insertJob } from "./db.js";
 import type { RawJob } from "./extract.js";
 
@@ -35,8 +35,11 @@ export function dedup(jobs: RawJob[], platform: string): DedupResult {
       crawled_at: new Date().toISOString(),
     });
 
-    if (wasInserted) inserted++;
-    else skipped++;
+    if (wasInserted) {
+      inserted++;
+    } else {
+      skipped++;
+    }
   }
 
   return { inserted, skipped };

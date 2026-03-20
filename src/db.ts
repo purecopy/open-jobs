@@ -2,25 +2,25 @@ import Database from "better-sqlite3";
 import { getConfig } from "./config.js";
 
 export interface Job {
-  id?: number;
+  company: string;
+  crawled_at: string;
+  deadline: string;
+  description: string;
+  employment_type: string;
   fingerprint: string;
+  id?: number;
+  language_flag: string;
+  language_required: string;
+  location: string;
+  platform: string;
+  posted_at: string;
+  relevance_reason: string;
+  relevance_score: number | null;
+  salary: string;
+  sent: number;
   title: string;
   title_en: string;
-  company: string;
   url: string;
-  platform: string;
-  location: string;
-  employment_type: string;
-  language_required: string;
-  description: string;
-  salary: string;
-  deadline: string;
-  posted_at: string;
-  crawled_at: string;
-  relevance_score: number | null;
-  relevance_reason: string;
-  language_flag: string;
-  sent: number;
 }
 
 let _db: Database.Database | null = null;
@@ -61,7 +61,12 @@ function migrate(db: Database.Database): void {
   `);
 }
 
-export function insertJob(job: Omit<Job, "id" | "relevance_score" | "relevance_reason" | "language_flag" | "sent">): boolean {
+export function insertJob(
+  job: Omit<
+    Job,
+    "id" | "relevance_score" | "relevance_reason" | "language_flag" | "sent"
+  >
+): boolean {
   const db = getDb();
   const stmt = db.prepare(`
     INSERT OR IGNORE INTO jobs (fingerprint, title, title_en, company, url, platform, location, employment_type, language_required, description, salary, deadline, posted_at, crawled_at)
@@ -78,39 +83,66 @@ export function getUnsentJobs(): Job[] {
 
 export function getUnscoredJobs(): Job[] {
   const db = getDb();
-  return db.prepare("SELECT * FROM jobs WHERE sent = 0 AND relevance_score IS NULL").all() as Job[];
+  return db
+    .prepare("SELECT * FROM jobs WHERE sent = 0 AND relevance_score IS NULL")
+    .all() as Job[];
 }
 
 export function expireJobs(): number {
   const db = getDb();
-  const result = db.prepare("UPDATE jobs SET sent = 1 WHERE deadline != '' AND deadline < date('now') AND sent = 0").run();
+  const result = db
+    .prepare(
+      "UPDATE jobs SET sent = 1 WHERE deadline != '' AND deadline < date('now') AND sent = 0"
+    )
+    .run();
   return result.changes;
 }
 
-export function updateScore(id: number, score: number, reason: string, flag: string): void {
+export function updateScore(
+  id: number,
+  score: number,
+  reason: string,
+  flag: string
+): void {
   const db = getDb();
-  db.prepare("UPDATE jobs SET relevance_score = ?, relevance_reason = ?, language_flag = ? WHERE id = ?").run(score, reason, flag, id);
+  db.prepare(
+    "UPDATE jobs SET relevance_score = ?, relevance_reason = ?, language_flag = ? WHERE id = ?"
+  ).run(score, reason, flag, id);
 }
 
 export function suppressLowScoring(threshold: number): number {
   const db = getDb();
-  const result = db.prepare("UPDATE jobs SET sent = 1 WHERE relevance_score IS NOT NULL AND relevance_score < ? AND sent = 0").run(threshold);
+  const result = db
+    .prepare(
+      "UPDATE jobs SET sent = 1 WHERE relevance_score IS NOT NULL AND relevance_score < ? AND sent = 0"
+    )
+    .run(threshold);
   return result.changes;
 }
 
 export function getScoredUnsentJobs(): Job[] {
   const db = getDb();
-  return db.prepare("SELECT * FROM jobs WHERE sent = 0 AND relevance_score IS NOT NULL ORDER BY relevance_score DESC").all() as Job[];
+  return db
+    .prepare(
+      "SELECT * FROM jobs WHERE sent = 0 AND relevance_score IS NOT NULL ORDER BY relevance_score DESC"
+    )
+    .all() as Job[];
 }
 
 export function markSent(ids: number[]): void {
-  if (ids.length === 0) return;
+  if (ids.length === 0) {
+    return;
+  }
   const db = getDb();
   const placeholders = ids.map(() => "?").join(",");
-  db.prepare(`UPDATE jobs SET sent = 1 WHERE id IN (${placeholders})`).run(...ids);
+  db.prepare(`UPDATE jobs SET sent = 1 WHERE id IN (${placeholders})`).run(
+    ...ids
+  );
 }
 
 export function getAllUrls(): string[] {
   const db = getDb();
-  return (db.prepare("SELECT url FROM jobs").all() as { url: string }[]).map((r) => r.url);
+  return (db.prepare("SELECT url FROM jobs").all() as { url: string }[]).map(
+    (r) => r.url
+  );
 }

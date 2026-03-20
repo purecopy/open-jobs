@@ -1,11 +1,11 @@
-import { platforms } from "./crawl/platforms.js";
-import { scrape, crawlAggregator } from "./crawl/firecrawl.js";
-import { discoverJobs } from "./crawl/perplexity.js";
-import { extractJobs } from "./extract.js";
-import { dedup } from "./dedup.js";
-import { scoreJobs } from "./score.js";
-import { generateDigest } from "./digest.js";
 import type { ScrapedPage } from "./crawl/firecrawl.js";
+import { crawlAggregator, scrape } from "./crawl/firecrawl.js";
+import { discoverJobs } from "./crawl/perplexity.js";
+import { platforms } from "./crawl/platforms.js";
+import { dedup } from "./dedup.js";
+import { generateDigest } from "./digest.js";
+import { extractJobs } from "./extract.js";
+import { scoreJobs } from "./score.js";
 
 const errors: string[] = [];
 
@@ -38,7 +38,9 @@ async function crawl(): Promise<void> {
       const result = dedup(jobs, platform.id);
       totalInserted += result.inserted;
       totalSkipped += result.skipped;
-      console.log(`  ${platform.id}: ${result.inserted} new, ${result.skipped} duplicates`);
+      console.log(
+        `  ${platform.id}: ${result.inserted} new, ${result.skipped} duplicates`
+      );
     } catch (err) {
       const msg = `${platform.id}: ${err instanceof Error ? err.message : err}`;
       console.error(`  Error crawling ${platform.id}: ${msg}`);
@@ -61,7 +63,9 @@ async function crawl(): Promise<void> {
         totalSkipped += result.skipped;
         totalPages++;
       } catch (err) {
-        console.error(`  Failed to process discovered URL ${url}: ${err instanceof Error ? err.message : err}`);
+        console.error(
+          `  Failed to process discovered URL ${url}: ${err instanceof Error ? err.message : err}`
+        );
       }
     }
   } catch (err) {
@@ -70,14 +74,18 @@ async function crawl(): Promise<void> {
     errors.push(msg);
   }
 
-  console.log(`[crawl] Done. ${totalPages} pages scraped, ${totalInserted} new jobs, ${totalSkipped} duplicates`);
+  console.log(
+    `[crawl] Done. ${totalPages} pages scraped, ${totalInserted} new jobs, ${totalSkipped} duplicates`
+  );
 }
 
 async function score(): Promise<void> {
   console.log("[score] Scoring jobs...");
   try {
     const result = await scoreJobs();
-    console.log(`[score] Done. ${result.scored} scored, ${result.expired} expired, ${result.suppressed} suppressed`);
+    console.log(
+      `[score] Done. ${result.scored} scored, ${result.expired} expired, ${result.suppressed} suppressed`
+    );
   } catch (err) {
     const msg = `scoring: ${err instanceof Error ? err.message : err}`;
     console.error(`  Error scoring: ${msg}`);

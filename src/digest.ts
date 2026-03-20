@@ -1,5 +1,5 @@
-import { getScoredUnsentJobs, markSent } from "./db.js";
 import type { Job } from "./db.js";
+import { getScoredUnsentJobs, markSent } from "./db.js";
 
 const FLAG_EMOJI: Record<string, string> = {
   green: "🟢 English ok",
@@ -9,8 +9,14 @@ const FLAG_EMOJI: Record<string, string> = {
 
 function formatJob(job: Job): string {
   const flag = FLAG_EMOJI[job.language_flag] || "⚪ Unknown";
-  const title = job.title_en && job.title_en !== job.title ? `${job.title}\n${job.title_en}` : job.title;
-  const type = job.employment_type !== "unknown" ? ` · ${job.employment_type.charAt(0).toUpperCase() + job.employment_type.slice(1)}` : "";
+  const title =
+    job.title_en && job.title_en !== job.title
+      ? `${job.title}\n${job.title_en}`
+      : job.title;
+  const type =
+    job.employment_type === "unknown"
+      ? ""
+      : ` · ${job.employment_type.charAt(0).toUpperCase() + job.employment_type.slice(1)}`;
 
   return [
     `⭐ ${job.relevance_score}/10 · ${flag}`,
@@ -37,7 +43,7 @@ export function generateDigest(): string | null {
   const digest = `${header}${separator}${body}`;
 
   // Mark all included jobs as sent
-  markSent(jobs.map((j) => j.id!));
+  markSent(jobs.map((j) => j.id as number));
 
   return digest;
 }
