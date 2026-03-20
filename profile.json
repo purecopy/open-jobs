@@ -1,0 +1,47 @@
+{
+  "name": "Zlata Pavlovskaia",
+  "location": {
+    "preferred": ["Wien", "Niederösterreich"],
+    "remote_ok": true
+  },
+  "roles": [
+    "Curatorial assistant / associate",
+    "Kunstvermittlung / art mediation",
+    "Project coordination at cultural institutions",
+    "Communications / PR at galleries, museums, Kunstvereine",
+    "Social media management for cultural orgs",
+    "Publishing / editorial at cultural organizations",
+    "Research positions at art institutions",
+    "Kulturmanagement",
+    "Veranstaltungsorganisation"
+  ],
+  "employment_type": ["full-time", "part-time"],
+  "languages": {
+    "spoken": ["English (fluent)", "Deutsch (A2)", "Russian (native)"],
+    "scoring_note": "German C1+ required roles should score low unless the listing suggests flexibility. English-friendly or international workplaces get a strong boost. Russian can be an asset for orgs working with Eastern European art/communities."
+  },
+  "experience_summary": "Independent curator and researcher with an Erasmus Mundus MA in Media Art Cultures (Aalborg University) and an MA in Curatorial Studies (SPbU/Bard College). Specializes in sound art, media art, and experimental publishing. Has curated 12+ exhibitions and projects across Denmark, Poland, and Russia. Professional experience spans curatorial work (Sound Art Lab, Struer Tracks Biennial), gallery management (NameGallery), art mediation (Hermitage, Russian Museum of Ethnography), social media/comms management, and editorial/publishing projects. Strong in project coordination, public programming, and artist communication.",
+  "strengths": [
+    "Curatorial practice — independent and institutional",
+    "Sound art and media art specialization",
+    "Art mediation — museum and gallery contexts",
+    "Social media, PR, and communications",
+    "Project and event coordination",
+    "Publishing, editing, and editorial work",
+    "Academic research and writing",
+    "Figma, Adobe Suite"
+  ],
+  "dealbreakers": [
+    "Requires fluent German (C1+) with no flexibility mentioned",
+    "Unpaid position",
+    "Requires technical skills she doesn't have (e.g. web development, accounting)"
+  ],
+  "nice_to_have": [
+    "English-speaking or international workplace",
+    "Sound art, media art, or contemporary art focus",
+    "Curatorial or mediation role",
+    "Flexible hours or part-time option",
+    "Language courses or German learning support provided",
+    "Small team / independent art space"
+  ]
+}
