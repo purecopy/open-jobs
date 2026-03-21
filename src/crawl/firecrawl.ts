@@ -1,19 +1,38 @@
-import { getFirecrawlClient } from "../libs/firecrawl.js";
+import {
+  getFirecrawlClient,
+  getResetDelay,
+  isRateLimitError,
+} from "../libs/firecrawl.js";
+import { withRetry } from "../libs/retry.js";
 
 export interface ScrapedPage {
   markdown: string;
   url: string;
 }
 
-export async function scrape(url: string): Promise<ScrapedPage> {
+export function scrape(url: string): Promise<ScrapedPage> {
   const client = getFirecrawlClient();
-  const result = await client.scrape(url, {
-    formats: ["markdown"],
-  });
-  if (!result.markdown) {
-    throw new Error(`Firecrawl scrape returned no content for ${url}`);
-  }
-  return { url, markdown: result.markdown };
+
+  return withRetry(
+    async () => {
+      const result = await client.scrape(url, { formats: ["markdown"] });
+      if (!result.markdown) {
+        throw new Error(`Firecrawl scrape returned no content for ${url}`);
+      }
+      return { url, markdown: result.markdown };
+    },
+    {
+      maxRetries: 3,
+      fallbackDelayMs: 15_000,
+      shouldRetry: isRateLimitError,
+      getRetryDelay: getResetDelay,
+      onRetry: (_, attempt, delayMs) => {
+        console.warn(
+          `  Rate limited on ${url}, retrying in ${Math.round(delayMs / 1000)}s (attempt ${attempt}/3)...`
+        );
+      },
+    }
+  );
 }
 
 const TRAILING_SLASH_RE = /\/$/;
