@@ -1,6 +1,7 @@
 pre-commit:
   jobs:
-    - run: npx ultracite fix
+    - name: format
+      run: npx ultracite fix
       glob:
         - "**/*.js"
         - "**/*.jsx"
@@ -10,3 +11,7 @@ pre-commit:
         - "**/*.jsonc"
         - "**/*.css"
       stage_fixed: true
+    - name: typecheck
+      run: npx tsc --noEmit
+      glob:
+        - "**/*.ts"
