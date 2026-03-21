@@ -7,7 +7,7 @@ import {
   updateScore,
 } from "./db.js";
 
-const MODEL = "claude-sonnet-4-6-20250514";
+const MODEL = "claude-opus-4-6";
 const JSON_ARRAY_RE = /\[[\s\S]*\]/;
 
 interface ScoredJob {
@@ -21,7 +21,10 @@ let _client: Anthropic | null = null;
 
 function getClient(): Anthropic {
   if (!_client) {
-    _client = new Anthropic({ apiKey: getConfig().anthropicApiKey });
+    _client = new Anthropic({
+      apiKey: getConfig().anthropicApiKey,
+      maxRetries: 5,
+    });
   }
   return _client;
 }

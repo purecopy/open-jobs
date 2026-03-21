@@ -92,7 +92,7 @@ export function expireJobs(): number {
   const db = getDb();
   const result = db
     .prepare(
-      "UPDATE jobs SET sent = 1 WHERE deadline != '' AND deadline < date('now') AND sent = 0"
+      "UPDATE jobs SET sent = 1 WHERE (deadline = 'expired' OR (deadline != '' AND deadline < date('now'))) AND sent = 0"
     )
     .run();
   return result.changes;

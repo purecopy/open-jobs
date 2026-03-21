@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getConfig } from "./config.js";
 import type { ScrapedPage } from "./crawl/firecrawl.js";
 
-const MODEL = "claude-sonnet-4-6-20250514";
+const MODEL = "claude-sonnet-4-6";
 const JSON_ARRAY_RE = /\[[\s\S]*\]/;
 
 export interface RawJob {
@@ -23,7 +23,10 @@ let _client: Anthropic | null = null;
 
 function getClient(): Anthropic {
   if (!_client) {
-    _client = new Anthropic({ apiKey: getConfig().anthropicApiKey });
+    _client = new Anthropic({
+      apiKey: getConfig().anthropicApiKey,
+      maxRetries: 5,
+    });
   }
   return _client;
 }
@@ -61,11 +64,12 @@ export async function extractJobs(
 - language_required: e.g. "Deutsch C1", "English ok", "unclear" — be specific about what the listing states
 - description: 2-3 sentence summary of the role
 - salary: If mentioned, otherwise ""
-- deadline: Application deadline in ISO 8601 format if stated, otherwise ""
+- deadline: Application deadline in ISO 8601 format if stated, otherwise "". If the page says the deadline has passed, the listing is closed, expired, or no longer accepting applications, set deadline to "expired".
 - posted_at: Posting date in ISO 8601 format if visible, otherwise ""
 
 If the listing language requirements are unclear, mark as "unclear".
 If a page contains no job listings, skip it.
+If a listing is clearly expired or closed, still extract it but set deadline to "expired".
 
 Return ONLY a JSON array of job objects, no other text.
 
@@ -84,10 +88,10 @@ ${pagesContent}`,
       return [];
     }
     const jobs = JSON.parse(jsonMatch[0]) as RawJob[];
-    // Ensure each job has a url fallback
-    return jobs.map((job, i) => ({
+    // Only fall back to page URL when there's exactly one page (1:1 mapping is safe)
+    return jobs.map((job) => ({
       ...job,
-      url: job.url || pages[i]?.url || "",
+      url: job.url || (pages.length === 1 ? pages[0].url : ""),
     }));
   } catch (err) {
     console.error(

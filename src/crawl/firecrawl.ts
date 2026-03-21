@@ -17,7 +17,9 @@ export interface ScrapedPage {
 
 export async function scrape(url: string): Promise<ScrapedPage> {
   const client = getClient();
-  const result = await client.scrape(url, { formats: ["markdown"] });
+  const result = await client.scrape(url, {
+    formats: ["markdown"],
+  });
   if (!result.markdown) {
     throw new Error(`Firecrawl scrape returned no content for ${url}`);
   }
