@@ -8,6 +8,7 @@ import {
 } from "./db.js";
 
 const MODEL = "claude-opus-4-6";
+const BATCH_SIZE = 10;
 const JSON_ARRAY_RE = /\[[\s\S]*\]/;
 
 interface ScoredJob {
@@ -16,6 +17,8 @@ interface ScoredJob {
   relevance_reason: string;
   relevance_score: number;
 }
+
+type UnscoredJob = ReturnType<typeof getUnscoredJobs>[number];
 
 let _client: Anthropic | null = null;
 
@@ -29,30 +32,12 @@ function getClient(): Anthropic {
   return _client;
 }
 
-export interface ScoreResult {
-  expired: number;
-  scored: number;
-  suppressed: number;
-}
-
-export async function scoreJobs(): Promise<ScoreResult> {
-  const config = getConfig();
-
-  // First: expire jobs past their deadline
-  const expired = expireJobs();
-  if (expired > 0) {
-    console.log(`  Expired ${expired} jobs past their deadline`);
-  }
-
-  const jobs = getUnscoredJobs();
-  if (jobs.length === 0) {
-    return { expired, scored: 0, suppressed: 0 };
-  }
-
-  const client = getClient();
-  const profileJson = JSON.stringify(config.profile, null, 2);
-
-  const jobsList = jobs
+async function scoreBatch(
+  client: Anthropic,
+  profileJson: string,
+  batch: UnscoredJob[]
+): Promise<ScoredJob[]> {
+  const jobsList = batch
     .map(
       (j) =>
         `[ID: ${j.id}] "${j.title}" at ${j.company} | Location: ${j.location} | Type: ${j.employment_type} | Language: ${j.language_required} | Description: ${j.description}`
@@ -94,24 +79,64 @@ ${jobsList}`,
   const text =
     response.content[0]?.type === "text" ? response.content[0].text : "";
 
-  try {
-    const jsonMatch = text.match(JSON_ARRAY_RE);
-    if (!jsonMatch) {
-      throw new Error("No JSON array in response");
-    }
-    const scored = JSON.parse(jsonMatch[0]) as ScoredJob[];
+  const jsonMatch = text.match(JSON_ARRAY_RE);
+  if (!jsonMatch) {
+    throw new Error("No JSON array in response");
+  }
+  return JSON.parse(jsonMatch[0]) as ScoredJob[];
+}
 
-    for (const s of scored) {
-      updateScore(s.id, s.relevance_score, s.relevance_reason, s.language_flag);
-    }
+export interface ScoreResult {
+  expired: number;
+  scored: number;
+  suppressed: number;
+}
 
-    const suppressed = suppressLowScoring(config.relevanceThreshold);
+export async function scoreJobs(): Promise<ScoreResult> {
+  const config = getConfig();
 
-    return { expired, scored: scored.length, suppressed };
-  } catch (err) {
-    console.error(
-      `  Failed to parse scoring response: ${err instanceof Error ? err.message : err}`
-    );
+  const expired = expireJobs();
+  if (expired > 0) {
+    console.log(`  Expired ${expired} jobs past their deadline`);
+  }
+
+  const jobs = getUnscoredJobs();
+  if (jobs.length === 0) {
     return { expired, scored: 0, suppressed: 0 };
   }
+
+  const client = getClient();
+  const profileJson = JSON.stringify(config.profile, null, 2);
+
+  let totalScored = 0;
+
+  for (let i = 0; i < jobs.length; i += BATCH_SIZE) {
+    const batch = jobs.slice(i, i + BATCH_SIZE);
+    const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+    const totalBatches = Math.ceil(jobs.length / BATCH_SIZE);
+    console.log(
+      `  Scoring batch ${batchNum}/${totalBatches} (${batch.length} jobs)`
+    );
+
+    try {
+      const scored = await scoreBatch(client, profileJson, batch);
+      for (const s of scored) {
+        updateScore(
+          s.id,
+          s.relevance_score,
+          s.relevance_reason,
+          s.language_flag
+        );
+      }
+      totalScored += scored.length;
+    } catch (err) {
+      console.error(
+        `  Failed to parse batch ${batchNum}: ${err instanceof Error ? err.message : err}`
+      );
+    }
+  }
+
+  const suppressed = suppressLowScoring(config.relevanceThreshold);
+
+  return { expired, scored: totalScored, suppressed };
 }
