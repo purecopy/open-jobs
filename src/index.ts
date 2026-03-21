@@ -21,7 +21,7 @@ async function crawl(): Promise<void> {
       let pages: ScrapedPage[];
 
       if (platform.type === "aggregator") {
-        pages = await crawlAggregator(platform.url);
+        pages = await crawlAggregator(platform.url, platform.crawlScope);
       } else {
         const page = await scrape(platform.url);
         pages = [page];

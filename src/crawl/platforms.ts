@@ -1,6 +1,13 @@
 export type PlatformType = "aggregator" | "institution";
 
+export interface CrawlScopeOptions {
+  excludePaths?: string[];
+  includePaths?: string[];
+  limit?: number;
+}
+
 export interface Platform {
+  crawlScope?: CrawlScopeOptions;
   id: string;
   type: PlatformType;
   url: string;
@@ -12,12 +19,28 @@ export const platforms: Platform[] = [
     id: "kulturkonzepte",
     url: "https://kulturkonzepte.at/service/jobboerse/",
     type: "aggregator",
+    crawlScope: {
+      includePaths: ["/service/jobboerse/.*"],
+      limit: 50,
+    },
   },
-  { id: "kupf", url: "https://kupf.at/kulturjobs", type: "aggregator" },
+  {
+    id: "kupf",
+    url: "https://kupf.at/kulturjobs",
+    type: "aggregator",
+    crawlScope: {
+      includePaths: ["/kulturjobs.*"],
+      limit: 50,
+    },
+  },
   {
     id: "igkultur",
     url: "https://igkultur.at/service/stellenanzeigen-jobs-kultur",
     type: "aggregator",
+    crawlScope: {
+      includePaths: ["/service/stellenanzeigen.*"],
+      limit: 50,
+    },
   },
 
   // Institution career pages — 0-2 jobs each, scraped directly
