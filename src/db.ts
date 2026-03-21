@@ -1,6 +1,6 @@
-import Cloudflare from "cloudflare";
 import type { QueryResult } from "cloudflare/resources/d1/database.js";
 import { getConfig } from "./config.js";
+import { getCloudflareClient } from "./libs/cloudflare.js";
 
 export interface Job {
   company: string;
@@ -24,21 +24,12 @@ export interface Job {
   url: string;
 }
 
-let _client: Cloudflare | null = null;
-
-function getClient(): Cloudflare {
-  if (!_client) {
-    _client = new Cloudflare({ apiToken: getConfig().cloudflareApiToken });
-  }
-  return _client;
-}
-
 async function queryD1(
   sql: string,
   params: string[] = []
 ): Promise<QueryResult> {
   const { cloudflareAccountId, d1DatabaseId } = getConfig();
-  const page = await getClient().d1.database.query(d1DatabaseId, {
+  const page = await getCloudflareClient().d1.database.query(d1DatabaseId, {
     account_id: cloudflareAccountId,
     sql,
     params,
