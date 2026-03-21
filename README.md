@@ -1,6 +1,6 @@
 # job-claw
 
-Daily job crawler for Austrian cultural sector positions. Crawls job boards, extracts and scores listings via Claude, deduplicates against SQLite, and prints a ranked digest to stdout.
+Daily job crawler for Austrian cultural sector positions. Crawls job boards, extracts and scores listings via Claude, deduplicates against Cloudflare D1, and prints a ranked digest to stdout.
 
 ## Commands
 
@@ -38,14 +38,14 @@ The `run` command is designed for OpenClaw cron. It:
 
 ## Database
 
-SQLite at `./openclaw.db` (configurable via `OPENCLAW_DB_PATH` in `.env`).
+Uses [Cloudflare D1](https://developers.cloudflare.com/d1/) (serverless SQLite) accessed via the `cloudflare` SDK. The schema is auto-created on first run.
 
 ```bash
-# Quick inspection
-sqlite3 openclaw.db "SELECT title, company, relevance_score FROM jobs WHERE sent = 0 ORDER BY relevance_score DESC"
+# Quick inspection via Wrangler
+npx wrangler d1 execute openclaw --command="SELECT title, company, relevance_score FROM jobs WHERE sent = 0 ORDER BY relevance_score DESC"
 
 # Stats
-sqlite3 openclaw.db "SELECT platform, count(*) FROM jobs GROUP BY platform"
+npx wrangler d1 execute openclaw --command="SELECT platform, count(*) FROM jobs GROUP BY platform"
 ```
 
 ## Environment
@@ -54,5 +54,7 @@ Requires `.env` with:
 - `ANTHROPIC_API_KEY`
 - `FIRECRAWL_API_KEY`
 - `PERPLEXITY_API_KEY`
-- `OPENCLAW_DB_PATH` (default: `./openclaw.db`)
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_API_TOKEN` — needs D1 Edit permission
+- `CLOUDFLARE_D1_DATABASE_ID`
 - `RELEVANCE_THRESHOLD` (default: `3`, jobs below this are suppressed)
