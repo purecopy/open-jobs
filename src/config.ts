@@ -18,7 +18,9 @@ export interface Profile {
 
 export interface Config {
   anthropicApiKey: string;
-  dbPath: string;
+  cloudflareAccountId: string;
+  cloudflareApiToken: string;
+  d1DatabaseId: string;
   firecrawlApiKey: string;
   perplexityApiKey: string;
   profile: Profile;
@@ -47,7 +49,9 @@ export function getConfig(): Config {
       anthropicApiKey: requireEnv("ANTHROPIC_API_KEY"),
       firecrawlApiKey: requireEnv("FIRECRAWL_API_KEY"),
       perplexityApiKey: requireEnv("PERPLEXITY_API_KEY"),
-      dbPath: process.env.OPENCLAW_DB_PATH || "./openclaw.db",
+      cloudflareAccountId: requireEnv("CLOUDFLARE_ACCOUNT_ID"),
+      cloudflareApiToken: requireEnv("CLOUDFLARE_API_TOKEN"),
+      d1DatabaseId: requireEnv("CLOUDFLARE_D1_DATABASE_ID"),
       relevanceThreshold: Number.parseInt(
         process.env.RELEVANCE_THRESHOLD || "3",
         10

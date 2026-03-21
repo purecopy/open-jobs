@@ -20,7 +20,7 @@ interface ScoredJob {
   relevance_score: number;
 }
 
-type UnscoredJob = ReturnType<typeof getUnscoredJobs>[number];
+type UnscoredJob = Awaited<ReturnType<typeof getUnscoredJobs>>[number];
 
 async function scoreBatch(
   client: Anthropic,
@@ -85,12 +85,12 @@ export interface ScoreResult {
 export async function scoreJobs(): Promise<ScoreResult> {
   const config = getConfig();
 
-  const expired = expireJobs();
+  const expired = await expireJobs();
   if (expired > 0) {
     console.log(`  Expired ${expired} jobs past their deadline`);
   }
 
-  const jobs = getUnscoredJobs();
+  const jobs = await getUnscoredJobs();
   if (jobs.length === 0) {
     return { expired, scored: 0, suppressed: 0 };
   }
@@ -109,7 +109,7 @@ export async function scoreJobs(): Promise<ScoreResult> {
     try {
       const scored = await scoreBatch(client, profileJson, batch);
       for (const s of scored) {
-        updateScore(
+        await updateScore(
           s.id,
           s.relevance_score,
           s.relevance_reason,
@@ -124,7 +124,7 @@ export async function scoreJobs(): Promise<ScoreResult> {
     }
   }
 
-  const suppressed = suppressLowScoring(config.relevanceThreshold);
+  const suppressed = await suppressLowScoring(config.relevanceThreshold);
 
   return { expired, scored: totalScored, suppressed };
 }

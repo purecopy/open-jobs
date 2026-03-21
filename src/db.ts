@@ -1,4 +1,5 @@
-import Database from "better-sqlite3";
+import Cloudflare from "cloudflare";
+import type { QueryResult } from "cloudflare/resources/d1/database.js";
 import { getConfig } from "./config.js";
 
 export interface Job {
@@ -23,19 +24,45 @@ export interface Job {
   url: string;
 }
 
-let _db: Database.Database | null = null;
+let _client: Cloudflare | null = null;
 
-export function getDb(): Database.Database {
-  if (!_db) {
-    _db = new Database(getConfig().dbPath);
-    _db.pragma("journal_mode = WAL");
-    migrate(_db);
+function getClient(): Cloudflare {
+  if (!_client) {
+    _client = new Cloudflare({ apiToken: getConfig().cloudflareApiToken });
   }
-  return _db;
+  return _client;
 }
 
-function migrate(db: Database.Database): void {
-  db.exec(`
+async function queryD1(
+  sql: string,
+  params: string[] = []
+): Promise<QueryResult> {
+  const { cloudflareAccountId, d1DatabaseId } = getConfig();
+  const page = await getClient().d1.database.query(d1DatabaseId, {
+    account_id: cloudflareAccountId,
+    sql,
+    params,
+  });
+  return page.result[0];
+}
+
+async function queryRows<T>(sql: string, params: string[] = []): Promise<T[]> {
+  const result = await queryD1(sql, params);
+  return (result.results ?? []) as T[];
+}
+
+async function execute(sql: string, params: string[] = []): Promise<number> {
+  const result = await queryD1(sql, params);
+  return result.meta?.changes ?? 0;
+}
+
+let _schemaReady = false;
+
+async function ensureSchema(): Promise<void> {
+  if (_schemaReady) {
+    return;
+  }
+  await queryD1(`
     CREATE TABLE IF NOT EXISTS jobs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       fingerprint TEXT UNIQUE NOT NULL,
@@ -59,90 +86,100 @@ function migrate(db: Database.Database): void {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `);
+  _schemaReady = true;
 }
 
-export function insertJob(
+export async function insertJob(
   job: Omit<
     Job,
     "id" | "relevance_score" | "relevance_reason" | "language_flag" | "sent"
   >
-): boolean {
-  const db = getDb();
-  const stmt = db.prepare(`
-    INSERT OR IGNORE INTO jobs (fingerprint, title, title_en, company, url, platform, location, employment_type, language_required, description, salary, deadline, posted_at, crawled_at)
-    VALUES (@fingerprint, @title, @title_en, @company, @url, @platform, @location, @employment_type, @language_required, @description, @salary, @deadline, @posted_at, @crawled_at)
-  `);
-  const result = stmt.run(job);
-  return result.changes > 0;
+): Promise<boolean> {
+  await ensureSchema();
+  const changes = await execute(
+    `INSERT OR IGNORE INTO jobs (fingerprint, title, title_en, company, url, platform, location, employment_type, language_required, description, salary, deadline, posted_at, crawled_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      job.fingerprint,
+      job.title,
+      job.title_en,
+      job.company,
+      job.url,
+      job.platform,
+      job.location,
+      job.employment_type,
+      job.language_required,
+      job.description,
+      job.salary,
+      job.deadline,
+      job.posted_at,
+      job.crawled_at,
+    ]
+  );
+  return changes > 0;
 }
 
-export function getUnsentJobs(): Job[] {
-  const db = getDb();
-  return db.prepare("SELECT * FROM jobs WHERE sent = 0").all() as Job[];
+export async function getUnsentJobs(): Promise<Job[]> {
+  await ensureSchema();
+  return queryRows<Job>("SELECT * FROM jobs WHERE sent = 0");
 }
 
-export function getUnscoredJobs(): Job[] {
-  const db = getDb();
-  return db
-    .prepare("SELECT * FROM jobs WHERE sent = 0 AND relevance_score IS NULL")
-    .all() as Job[];
+export async function getUnscoredJobs(): Promise<Job[]> {
+  await ensureSchema();
+  return queryRows<Job>(
+    "SELECT * FROM jobs WHERE sent = 0 AND relevance_score IS NULL"
+  );
 }
 
-export function expireJobs(): number {
-  const db = getDb();
-  const result = db
-    .prepare(
-      "UPDATE jobs SET sent = 1 WHERE (deadline = 'expired' OR (deadline != '' AND deadline < date('now'))) AND sent = 0"
-    )
-    .run();
-  return result.changes;
+export async function expireJobs(): Promise<number> {
+  await ensureSchema();
+  return execute(
+    "UPDATE jobs SET sent = 1 WHERE (deadline = 'expired' OR (deadline != '' AND deadline < date('now'))) AND sent = 0"
+  );
 }
 
-export function updateScore(
+export async function updateScore(
   id: number,
   score: number,
   reason: string,
   flag: string
-): void {
-  const db = getDb();
-  db.prepare(
-    "UPDATE jobs SET relevance_score = ?, relevance_reason = ?, language_flag = ? WHERE id = ?"
-  ).run(score, reason, flag, id);
+): Promise<void> {
+  await ensureSchema();
+  await execute(
+    "UPDATE jobs SET relevance_score = ?, relevance_reason = ?, language_flag = ? WHERE id = ?",
+    [String(score), reason, flag, String(id)]
+  );
 }
 
-export function suppressLowScoring(threshold: number): number {
-  const db = getDb();
-  const result = db
-    .prepare(
-      "UPDATE jobs SET sent = 1 WHERE relevance_score IS NOT NULL AND relevance_score < ? AND sent = 0"
-    )
-    .run(threshold);
-  return result.changes;
+export async function suppressLowScoring(threshold: number): Promise<number> {
+  await ensureSchema();
+  return execute(
+    "UPDATE jobs SET sent = 1 WHERE relevance_score IS NOT NULL AND relevance_score < ? AND sent = 0",
+    [String(threshold)]
+  );
 }
 
-export function getScoredUnsentJobs(): Job[] {
-  const db = getDb();
-  return db
-    .prepare(
-      "SELECT * FROM jobs WHERE sent = 0 AND relevance_score IS NOT NULL ORDER BY relevance_score DESC"
-    )
-    .all() as Job[];
+export async function getScoredUnsentJobs(): Promise<Job[]> {
+  await ensureSchema();
+  return queryRows<Job>(
+    "SELECT * FROM jobs WHERE sent = 0 AND relevance_score IS NOT NULL ORDER BY relevance_score DESC"
+  );
 }
 
-export function markSent(ids: number[]): void {
+export async function markSent(ids: number[]): Promise<void> {
   if (ids.length === 0) {
     return;
   }
-  const db = getDb();
+  await ensureSchema();
   const placeholders = ids.map(() => "?").join(",");
-  db.prepare(`UPDATE jobs SET sent = 1 WHERE id IN (${placeholders})`).run(
-    ...ids
+  await execute(
+    `UPDATE jobs SET sent = 1 WHERE id IN (${placeholders})`,
+    ids.map(String)
   );
 }
 
-export function getAllUrls(): string[] {
-  const db = getDb();
-  return (db.prepare("SELECT url FROM jobs").all() as { url: string }[]).map(
-    (r) => r.url
-  );
+export async function getAllUrls(): Promise<string[]> {
+  await ensureSchema();
+  const rows = await queryRows<{ url: string }>("SELECT url FROM jobs");
+  return rows.map((r) => r.url);
 }

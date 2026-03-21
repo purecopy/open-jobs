@@ -35,7 +35,7 @@ async function crawl(): Promise<void> {
       console.log(`  Extracted ${jobs.length} job(s) from ${platform.id}`);
 
       // Dedup and store
-      const result = dedup(jobs, platform.id);
+      const result = await dedup(jobs, platform.id);
       totalInserted += result.inserted;
       totalSkipped += result.skipped;
       console.log(
@@ -58,7 +58,7 @@ async function crawl(): Promise<void> {
       try {
         const page = await scrape(url);
         const jobs = await extractJobs([page], "perplexity");
-        const result = dedup(jobs, "perplexity");
+        const result = await dedup(jobs, "perplexity");
         totalInserted += result.inserted;
         totalSkipped += result.skipped;
         totalPages++;
@@ -93,10 +93,10 @@ async function score(): Promise<void> {
   }
 }
 
-function digest(): void {
+async function digest(): Promise<void> {
   console.log("[digest] Generating digest...");
   try {
-    const output = generateDigest();
+    const output = await generateDigest();
     if (output) {
       // Print digest to stdout for OpenClaw to pick up
       console.log(output);
@@ -113,7 +113,7 @@ function digest(): void {
 async function run(): Promise<void> {
   await crawl();
   await score();
-  digest();
+  await digest();
 
   if (errors.length > 0) {
     console.log(`\n⚠️ job-claw errors: ${errors.join("; ")}`);
@@ -131,7 +131,7 @@ switch (command) {
     score().catch(console.error);
     break;
   case "digest":
-    digest();
+    digest().catch(console.error);
     break;
   case "run":
     run().catch(console.error);

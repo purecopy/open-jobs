@@ -12,13 +12,16 @@ export interface DedupResult {
   skipped: number;
 }
 
-export function dedup(jobs: RawJob[], platform: string): DedupResult {
+export async function dedup(
+  jobs: RawJob[],
+  platform: string
+): Promise<DedupResult> {
   let inserted = 0;
   let skipped = 0;
 
   for (const job of jobs) {
     const fingerprint = computeFingerprint(job.company, job.title);
-    const wasInserted = insertJob({
+    const wasInserted = await insertJob({
       fingerprint,
       title: job.title,
       title_en: job.title_en,

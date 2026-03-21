@@ -68,7 +68,7 @@ export async function discoverJobs(): Promise<string[]> {
   }
 
   // Filter out URLs we already have in the DB
-  const knownUrls = new Set(getAllUrls());
+  const knownUrls = new Set(await getAllUrls());
   const newUrls = [...urls].filter((u) => {
     // Skip generic pages
     try {

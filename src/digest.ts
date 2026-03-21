@@ -28,8 +28,8 @@ function formatJob(job: Job): string {
   ].join("\n");
 }
 
-export function generateDigest(): string | null {
-  const jobs = getScoredUnsentJobs();
+export async function generateDigest(): Promise<string | null> {
+  const jobs = await getScoredUnsentJobs();
 
   if (jobs.length === 0) {
     return null;
@@ -43,7 +43,7 @@ export function generateDigest(): string | null {
   const digest = `${header}${separator}${body}`;
 
   // Mark all included jobs as sent
-  markSent(jobs.map((j) => j.id as number));
+  await markSent(jobs.map((j) => j.id as number));
 
   return digest;
 }
