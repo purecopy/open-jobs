@@ -3,6 +3,7 @@ import { getConfig } from "./config.js";
 import type { ScrapedPage } from "./crawl/firecrawl.js";
 
 const MODEL = "claude-sonnet-4-6";
+const BATCH_SIZE = 5;
 const JSON_ARRAY_RE = /\[[\s\S]*\]/;
 
 export interface RawJob {
@@ -31,17 +32,11 @@ function getClient(): Anthropic {
   return _client;
 }
 
-export async function extractJobs(
-  pages: ScrapedPage[],
-  platform: string
+async function extractBatch(
+  client: Anthropic,
+  batch: ScrapedPage[]
 ): Promise<RawJob[]> {
-  if (pages.length === 0) {
-    return [];
-  }
-
-  const client = getClient();
-
-  const pagesContent = pages
+  const pagesContent = batch
     .map(
       (p, i) => `--- Page ${i + 1}: ${p.url} ---\n${p.markdown.slice(0, 8000)}`
     )
@@ -81,22 +76,45 @@ ${pagesContent}`,
   const text =
     response.content[0]?.type === "text" ? response.content[0].text : "";
 
-  try {
-    // Extract JSON array from response (may be wrapped in markdown code blocks)
-    const jsonMatch = text.match(JSON_ARRAY_RE);
-    if (!jsonMatch) {
-      return [];
-    }
-    const jobs = JSON.parse(jsonMatch[0]) as RawJob[];
-    // Only fall back to page URL when there's exactly one page (1:1 mapping is safe)
-    return jobs.map((job) => ({
-      ...job,
-      url: job.url || (pages.length === 1 ? pages[0].url : ""),
-    }));
-  } catch (err) {
-    console.error(
-      `  Failed to parse extraction response for ${platform}: ${err instanceof Error ? err.message : err}`
-    );
+  const jsonMatch = text.match(JSON_ARRAY_RE);
+  if (!jsonMatch) {
     return [];
   }
+  const jobs = JSON.parse(jsonMatch[0]) as RawJob[];
+  return jobs.map((job) => ({
+    ...job,
+    url: job.url || (batch.length === 1 ? batch[0].url : ""),
+  }));
+}
+
+export async function extractJobs(
+  pages: ScrapedPage[],
+  platform: string
+): Promise<RawJob[]> {
+  if (pages.length === 0) {
+    return [];
+  }
+
+  const client = getClient();
+  const allJobs: RawJob[] = [];
+
+  for (let i = 0; i < pages.length; i += BATCH_SIZE) {
+    const batch = pages.slice(i, i + BATCH_SIZE);
+    const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+    const totalBatches = Math.ceil(pages.length / BATCH_SIZE);
+    console.log(
+      `  Extracting batch ${batchNum}/${totalBatches} (${batch.length} pages) for ${platform}`
+    );
+
+    try {
+      const jobs = await extractBatch(client, batch);
+      allJobs.push(...jobs);
+    } catch (err) {
+      console.error(
+        `  Failed to extract batch ${batchNum} for ${platform}: ${err instanceof Error ? err.message : err}`
+      );
+    }
+  }
+
+  return allJobs;
 }
