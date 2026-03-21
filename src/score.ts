@@ -6,6 +6,7 @@ import {
   suppressLowScoring,
   updateScore,
 } from "./db.js";
+import { chunk } from "./utils/chunk.js";
 
 const MODEL = "claude-opus-4-6";
 const BATCH_SIZE = 10;
@@ -109,13 +110,11 @@ export async function scoreJobs(): Promise<ScoreResult> {
   const profileJson = JSON.stringify(config.profile, null, 2);
 
   let totalScored = 0;
+  const batches = chunk(jobs, BATCH_SIZE);
 
-  for (let i = 0; i < jobs.length; i += BATCH_SIZE) {
-    const batch = jobs.slice(i, i + BATCH_SIZE);
-    const batchNum = Math.floor(i / BATCH_SIZE) + 1;
-    const totalBatches = Math.ceil(jobs.length / BATCH_SIZE);
+  for (const [i, batch] of batches.entries()) {
     console.log(
-      `  Scoring batch ${batchNum}/${totalBatches} (${batch.length} jobs)`
+      `  Scoring batch ${i + 1}/${batches.length} (${batch.length} jobs)`
     );
 
     try {
@@ -131,7 +130,7 @@ export async function scoreJobs(): Promise<ScoreResult> {
       totalScored += scored.length;
     } catch (err) {
       console.error(
-        `  Failed to parse batch ${batchNum}: ${err instanceof Error ? err.message : err}`
+        `  Failed to parse batch ${i + 1}: ${err instanceof Error ? err.message : err}`
       );
     }
   }

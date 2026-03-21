@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getConfig } from "./config.js";
 import type { ScrapedPage } from "./crawl/firecrawl.js";
+import { chunk } from "./utils/chunk.js";
 
 const MODEL = "claude-sonnet-4-6";
 const BATCH_SIZE = 5;
@@ -97,13 +98,11 @@ export async function extractJobs(
 
   const client = getClient();
   const allJobs: RawJob[] = [];
+  const batches = chunk(pages, BATCH_SIZE);
 
-  for (let i = 0; i < pages.length; i += BATCH_SIZE) {
-    const batch = pages.slice(i, i + BATCH_SIZE);
-    const batchNum = Math.floor(i / BATCH_SIZE) + 1;
-    const totalBatches = Math.ceil(pages.length / BATCH_SIZE);
+  for (const [i, batch] of batches.entries()) {
     console.log(
-      `  Extracting batch ${batchNum}/${totalBatches} (${batch.length} pages) for ${platform}`
+      `  Extracting batch ${i + 1}/${batches.length} (${batch.length} pages) for ${platform}`
     );
 
     try {
@@ -111,7 +110,7 @@ export async function extractJobs(
       allJobs.push(...jobs);
     } catch (err) {
       console.error(
-        `  Failed to extract batch ${batchNum} for ${platform}: ${err instanceof Error ? err.message : err}`
+        `  Failed to extract batch ${i + 1} for ${platform}: ${err instanceof Error ? err.message : err}`
       );
     }
   }
