@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 import { getConfig } from "./config.js";
 import {
   expireJobs,
@@ -6,6 +6,7 @@ import {
   suppressLowScoring,
   updateScore,
 } from "./db.js";
+import { getAnthropicClient } from "./libs/anthropic.js";
 import { chunk } from "./utils/chunk.js";
 
 const MODEL = "claude-opus-4-6";
@@ -20,18 +21,6 @@ interface ScoredJob {
 }
 
 type UnscoredJob = ReturnType<typeof getUnscoredJobs>[number];
-
-let _client: Anthropic | null = null;
-
-function getClient(): Anthropic {
-  if (!_client) {
-    _client = new Anthropic({
-      apiKey: getConfig().anthropicApiKey,
-      maxRetries: 5,
-    });
-  }
-  return _client;
-}
 
 async function scoreBatch(
   client: Anthropic,
@@ -106,7 +95,7 @@ export async function scoreJobs(): Promise<ScoreResult> {
     return { expired, scored: 0, suppressed: 0 };
   }
 
-  const client = getClient();
+  const client = getAnthropicClient();
   const profileJson = JSON.stringify(config.profile, null, 2);
 
   let totalScored = 0;

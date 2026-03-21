@@ -1,6 +1,6 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { getConfig } from "./config.js";
+import type Anthropic from "@anthropic-ai/sdk";
 import type { ScrapedPage } from "./crawl/firecrawl.js";
+import { getAnthropicClient } from "./libs/anthropic.js";
 import { chunk } from "./utils/chunk.js";
 
 const MODEL = "claude-sonnet-4-6";
@@ -19,18 +19,6 @@ export interface RawJob {
   title: string;
   title_en: string;
   url: string;
-}
-
-let _client: Anthropic | null = null;
-
-function getClient(): Anthropic {
-  if (!_client) {
-    _client = new Anthropic({
-      apiKey: getConfig().anthropicApiKey,
-      maxRetries: 5,
-    });
-  }
-  return _client;
 }
 
 async function extractBatch(
@@ -96,7 +84,7 @@ export async function extractJobs(
     return [];
   }
 
-  const client = getClient();
+  const client = getAnthropicClient();
   const allJobs: RawJob[] = [];
   const batches = chunk(pages, BATCH_SIZE);
 

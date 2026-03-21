@@ -1,14 +1,4 @@
-import FirecrawlApp from "@mendable/firecrawl-js";
-import { getConfig } from "../config.js";
-
-let _client: FirecrawlApp | null = null;
-
-function getClient(): FirecrawlApp {
-  if (!_client) {
-    _client = new FirecrawlApp({ apiKey: getConfig().firecrawlApiKey });
-  }
-  return _client;
-}
+import { getFirecrawlClient } from "../libs/firecrawl.js";
 
 export interface ScrapedPage {
   markdown: string;
@@ -16,7 +6,7 @@ export interface ScrapedPage {
 }
 
 export async function scrape(url: string): Promise<ScrapedPage> {
-  const client = getClient();
+  const client = getFirecrawlClient();
   const result = await client.scrape(url, {
     formats: ["markdown"],
   });
