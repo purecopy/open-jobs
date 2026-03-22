@@ -15,18 +15,30 @@ export async function discoverJobs(): Promise<string[]> {
   const config = getConfig();
   const profile = config.profile;
 
-  const rolesList = profile.roles.slice(0, 5).join(", ");
-  const locations = profile.location.preferred.join(", ");
-
-  const query = `Current job openings in ${locations} Austria: ${rolesList} at museums, galleries, Kunstvereine, cultural institutions. Include English-friendly workplaces. Return URLs to the actual job postings.`;
-
   const messages: PerplexityMessage[] = [
     {
       role: "system",
-      content:
-        "You are a job search assistant. Find current, active job listings matching the query. Return the specific URLs to job postings, not general career pages.",
+      content: `You are an expert job search assistant specializing in the Austrian arts and culture sector. Your task is to find real, currently open job postings matching the candidate profile provided as JSON.
+
+Rules:
+- Only return URLs that point to specific, individual job listings — not career landing pages or organizational homepages.
+- Each URL must be for a position that is currently open and accepting applications.
+- Include postings in both German and English.
+- Respect the candidate's language abilities and dealbreakers when selecting results.
+- For each URL, briefly note the role title and employer so the results can be verified.
+- If a job board aggregates listings, return the direct link to the specific posting, not the search results page.
+- Search on Austrian job boards (karriere.at, ams.at, StepStone.at), cultural job boards (kunstjobs.at, basis-wien.at, cultural-jobs.net, IG Kultur), and directly on institutional career pages.`,
     },
-    { role: "user", content: query },
+    {
+      role: "user",
+      content: `Find currently open job postings matching this candidate profile:
+
+${JSON.stringify(profile, null, 2)}
+
+Target employers: museums, galleries, Kunstvereine, Kulturhäuser, art foundations, biennials, cultural festivals, publishers, and arts organizations in Austria.
+
+Return only direct URLs to individual job postings that are currently accepting applications.`,
+    },
   ];
 
   const response = await fetch("https://api.perplexity.ai/chat/completions", {
@@ -38,6 +50,7 @@ export async function discoverJobs(): Promise<string[]> {
     body: JSON.stringify({
       model: "sonar",
       messages,
+      search_recency_filter: "week",
     }),
   });
 
