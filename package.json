@@ -21,7 +21,8 @@
     "cloudflare": "^5.2.0",
     "dotenv": "^17.3.1",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.7",

@@ -1,4 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { z } from "zod";
 import { getConfig } from "./config.js";
 import {
   expireJobs,
@@ -14,14 +16,19 @@ const log = createLogger("score");
 
 const MODEL = "claude-opus-4-6";
 const BATCH_SIZE = 10;
-const JSON_ARRAY_RE = /\[[\s\S]*\]/;
 
-interface ScoredJob {
-  id: number;
-  language_flag: "green" | "yellow" | "red";
-  relevance_reason: string;
-  relevance_score: number;
-}
+const ScoredJobSchema = z.object({
+  id: z.number(),
+  language_flag: z.enum(["green", "yellow", "red"]),
+  relevance_reason: z.string(),
+  relevance_score: z.number(),
+});
+
+const ScoringResultSchema = z.object({
+  jobs: z.array(ScoredJobSchema),
+});
+
+type ScoredJob = z.infer<typeof ScoredJobSchema>;
 
 type UnscoredJob = Awaited<ReturnType<typeof getUnscoredJobs>>[number];
 
@@ -37,7 +44,7 @@ async function scoreBatch(
     )
     .join("\n");
 
-  const response = await client.messages.create({
+  const response = await client.messages.parse({
     model: MODEL,
     max_tokens: 4096,
     messages: [
@@ -59,24 +66,18 @@ Language flag (independent of score):
 - "yellow": Some German helpful, A2-B1 might suffice
 - "red": Fluent German (C1+) explicitly required
 
-For each job, return a JSON object with: id, relevance_score (1-10), relevance_reason (one sentence, English), language_flag ("green"/"yellow"/"red").
-
-Return ONLY a JSON array, no other text.
+For each job, return an object with: id, relevance_score (1-10), relevance_reason (one sentence, English), language_flag ("green"/"yellow"/"red").
 
 Jobs to score:
 ${jobsList}`,
       },
     ],
+    output_config: {
+      format: zodOutputFormat(ScoringResultSchema),
+    },
   });
 
-  const text =
-    response.content[0]?.type === "text" ? response.content[0].text : "";
-
-  const jsonMatch = text.match(JSON_ARRAY_RE);
-  if (!jsonMatch) {
-    throw new Error("No JSON array in response");
-  }
-  return JSON.parse(jsonMatch[0]) as ScoredJob[];
+  return response.parsed_output?.jobs ?? [];
 }
 
 export interface ScoreResult {

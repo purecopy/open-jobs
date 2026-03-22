@@ -1,4 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { z } from "zod";
 import { storeArtifact } from "./artifacts.js";
 import type { ScrapedPage } from "./crawl/firecrawl.js";
 import { getAnthropicClient } from "./libs/anthropic.js";
@@ -9,21 +11,26 @@ const log = createLogger("extract");
 
 const MODEL = "claude-sonnet-4-6";
 const BATCH_SIZE = 5;
-const JSON_ARRAY_RE = /\[[\s\S]*\]/;
 
-export interface RawJob {
-  company: string;
-  deadline: string;
-  description: string;
-  employment_type: string;
-  language_required: string;
-  location: string;
-  posted_at: string;
-  salary: string;
-  title: string;
-  title_en: string;
-  url: string;
-}
+const RawJobSchema = z.object({
+  company: z.string(),
+  deadline: z.string(),
+  description: z.string(),
+  employment_type: z.string(),
+  language_required: z.string(),
+  location: z.string(),
+  posted_at: z.string(),
+  salary: z.string(),
+  title: z.string(),
+  title_en: z.string(),
+  url: z.string(),
+});
+
+const ExtractionResultSchema = z.object({
+  jobs: z.array(RawJobSchema),
+});
+
+export type RawJob = z.infer<typeof RawJobSchema>;
 
 async function extractBatch(
   client: Anthropic,
@@ -41,7 +48,7 @@ async function extractBatch(
     pagesContent
   );
 
-  const response = await client.messages.create({
+  const response = await client.messages.parse({
     model: MODEL,
     max_tokens: 4096,
     messages: [
@@ -65,24 +72,27 @@ If the listing language requirements are unclear, mark as "unclear".
 If a page contains no job listings, skip it.
 If a listing is clearly expired or closed, still extract it but set deadline to "expired".
 
-Return ONLY a JSON array of job objects, no other text.
-
 ${pagesContent}`,
       },
     ],
+    output_config: {
+      format: zodOutputFormat(ExtractionResultSchema),
+    },
   });
 
-  const text =
-    response.content[0]?.type === "text" ? response.content[0].text : "";
+  const result = response.parsed_output;
 
-  storeArtifact("extraction-output", `${platform}-${batchLabel}.txt`, text);
+  storeArtifact(
+    "extraction-output",
+    `${platform}-${batchLabel}.txt`,
+    JSON.stringify(result, null, 2)
+  );
 
-  const jsonMatch = text.match(JSON_ARRAY_RE);
-  if (!jsonMatch) {
+  if (!result) {
     return [];
   }
-  const jobs = JSON.parse(jsonMatch[0]) as RawJob[];
-  return jobs.map((job) => ({
+
+  return result.jobs.map((job) => ({
     ...job,
     url: job.url || (batch.length === 1 ? batch[0].url : ""),
   }));
