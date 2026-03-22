@@ -43,6 +43,7 @@ export const platforms: Platform[] = [
     },
   },
 
+  /*
   // Institution career pages — 0-2 jobs each, scraped directly
   { id: "mumok", url: "https://www.mumok.at/en/jobs", type: "institution" },
   {
@@ -76,4 +77,5 @@ export const platforms: Platform[] = [
     url: "https://www.festwochen.at/jobs",
     type: "institution",
   },
+   */
 ];
