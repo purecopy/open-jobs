@@ -1,6 +1,6 @@
 import { storeArtifact } from "./artifacts.js";
 import type { ScrapedPage } from "./crawl/firecrawl.js";
-import { crawlAggregator, scrape } from "./crawl/firecrawl.js";
+import { discoverAggregatorJobs, scrape } from "./crawl/firecrawl.js";
 import { discoverJobs } from "./crawl/perplexity.js";
 import { platforms } from "./crawl/platforms.js";
 import { getAllUrls } from "./db.js";
@@ -24,7 +24,10 @@ async function scrapePlatform(
   knownUrls: Set<string>
 ): Promise<ScrapedPage[]> {
   if (platform.type === "aggregator") {
-    const pages = await crawlAggregator(platform.url, platform.crawlScope);
+    const pages = await discoverAggregatorJobs(
+      platform.url,
+      platform.crawlScope
+    );
 
     const newPages = pages.filter((p) => !knownUrls.has(p.url));
     const skippedCount = pages.length - newPages.length;
