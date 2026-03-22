@@ -7,7 +7,10 @@ import {
   updateScore,
 } from "./db.js";
 import { getAnthropicClient } from "./libs/anthropic.js";
+import { createLogger } from "./logger.js";
 import { chunk } from "./utils/chunk.js";
+
+const log = createLogger("score");
 
 const MODEL = "claude-opus-4-6";
 const BATCH_SIZE = 10;
@@ -87,7 +90,7 @@ export async function scoreJobs(): Promise<ScoreResult> {
 
   const expired = await expireJobs();
   if (expired > 0) {
-    console.log(`  Expired ${expired} jobs past their deadline`);
+    log.info(`Expired ${expired} jobs past their deadline`);
   }
 
   const jobs = await getUnscoredJobs();
@@ -102,9 +105,7 @@ export async function scoreJobs(): Promise<ScoreResult> {
   const batches = chunk(jobs, BATCH_SIZE);
 
   for (const [i, batch] of batches.entries()) {
-    console.log(
-      `  Scoring batch ${i + 1}/${batches.length} (${batch.length} jobs)`
-    );
+    log.info(`Scoring batch ${i + 1}/${batches.length} (${batch.length} jobs)`);
 
     try {
       const scored = await scoreBatch(client, profileJson, batch);
@@ -118,8 +119,8 @@ export async function scoreJobs(): Promise<ScoreResult> {
       }
       totalScored += scored.length;
     } catch (err) {
-      console.error(
-        `  Failed to parse batch ${i + 1}: ${err instanceof Error ? err.message : err}`
+      log.error(
+        `Failed to parse batch ${i + 1}: ${err instanceof Error ? err.message : err}`
       );
     }
   }

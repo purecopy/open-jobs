@@ -4,8 +4,11 @@ import {
   isRateLimitError,
 } from "../libs/firecrawl.js";
 import { withRetry } from "../libs/retry.js";
+import { createLogger } from "../logger.js";
 import { chunk } from "../utils/chunk.js";
 import type { CrawlScopeOptions } from "./platforms.js";
+
+const log = createLogger("firecrawl");
 
 export interface ScrapedPage {
   markdown: string;
@@ -63,7 +66,7 @@ async function scrapeUrls(urls: string[]): Promise<ScrapedPage[]> {
       if (result.status === "fulfilled") {
         pages.push(result.value);
       } else {
-        console.warn(`  Failed to scrape: ${result.reason}`);
+        log.warn(`Failed to scrape: ${result.reason}`);
       }
     }
   }
@@ -88,8 +91,8 @@ export function scrape(url: string): Promise<ScrapedPage> {
       shouldRetry: isRateLimitError,
       getRetryDelay: getResetDelay,
       onRetry: (_, attempt, delayMs) => {
-        console.warn(
-          `  Rate limited on ${url}, retrying in ${Math.round(delayMs / 1000)}s (attempt ${attempt}/3)...`
+        log.warn(
+          `Rate limited on ${url}, retrying in ${Math.round(delayMs / 1000)}s (attempt ${attempt}/3)`
         );
       },
     }
@@ -123,8 +126,8 @@ export async function crawlAggregator(
       shouldRetry: isRateLimitError,
       getRetryDelay: getResetDelay,
       onRetry: (_, attempt, delayMs) => {
-        console.warn(
-          `  Rate limited on crawl ${platformUrl}, retrying in ${Math.round(delayMs / 1000)}s (attempt ${attempt}/3)...`
+        log.warn(
+          `Rate limited on crawl ${platformUrl}, retrying in ${Math.round(delayMs / 1000)}s (attempt ${attempt}/3)`
         );
       },
     }
@@ -134,9 +137,7 @@ export async function crawlAggregator(
     throw new Error(`Crawl failed for ${platformUrl}`);
   }
 
-  console.log(
-    `  [crawl-debug] Crawl job status: ${job.status}, total docs: ${job.data.length}`
-  );
+  log.debug(`Crawl job status: ${job.status}, total docs: ${job.data.length}`);
 
   // Post-filter by includePaths (if defined) since we no longer pass them to Firecrawl
   const pages: ScrapedPage[] = [];
@@ -154,15 +155,15 @@ export async function crawlAggregator(
     pages.push({ markdown: doc.markdown, url });
   }
 
-  console.log(`  [crawl-debug] Usable pages after filtering: ${pages.length}`);
+  log.debug(`Usable pages after filtering: ${pages.length}`);
 
   if (pages.length > 0) {
     return pages;
   }
 
   // Fallback: scrape the overview page directly, then discover job URLs
-  console.log(
-    `  [crawl-debug] No usable pages from crawl, falling back to link discovery on ${platformUrl}`
+  log.debug(
+    `No usable pages from crawl, falling back to link discovery on ${platformUrl}`
   );
   const overview = await scrape(platformUrl);
 
@@ -174,8 +175,8 @@ export async function crawlAggregator(
     ).slice(0, limit);
 
     if (discoveredUrls.length > 0) {
-      console.log(
-        `  [crawl-debug] Discovered ${discoveredUrls.length} job URL(s) from overview, scraping individually...`
+      log.debug(
+        `Discovered ${discoveredUrls.length} job URL(s) from overview, scraping individually`
       );
       return scrapeUrls(discoveredUrls);
     }

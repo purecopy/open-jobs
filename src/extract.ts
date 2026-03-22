@@ -1,7 +1,11 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import { storeArtifact } from "./artifacts.js";
 import type { ScrapedPage } from "./crawl/firecrawl.js";
 import { getAnthropicClient } from "./libs/anthropic.js";
+import { createLogger } from "./logger.js";
 import { chunk } from "./utils/chunk.js";
+
+const log = createLogger("extract");
 
 const MODEL = "claude-sonnet-4-6";
 const BATCH_SIZE = 5;
@@ -23,11 +27,19 @@ export interface RawJob {
 
 async function extractBatch(
   client: Anthropic,
-  batch: ScrapedPage[]
+  batch: ScrapedPage[],
+  platform: string,
+  batchLabel: string
 ): Promise<RawJob[]> {
   const pagesContent = batch
     .map((p, i) => `--- Page ${i + 1}: ${p.url} ---\n${p.markdown}`)
     .join("\n\n");
+
+  storeArtifact(
+    "extraction-input",
+    `${platform}-${batchLabel}.txt`,
+    pagesContent
+  );
 
   const response = await client.messages.create({
     model: MODEL,
@@ -63,6 +75,8 @@ ${pagesContent}`,
   const text =
     response.content[0]?.type === "text" ? response.content[0].text : "";
 
+  storeArtifact("extraction-output", `${platform}-${batchLabel}.txt`, text);
+
   const jsonMatch = text.match(JSON_ARRAY_RE);
   if (!jsonMatch) {
     return [];
@@ -87,16 +101,17 @@ export async function extractJobs(
   const batches = chunk(pages, BATCH_SIZE);
 
   for (const [i, batch] of batches.entries()) {
-    console.log(
-      `  Extracting batch ${i + 1}/${batches.length} (${batch.length} pages) for ${platform}`
+    const batchLabel = `batch-${i + 1}`;
+    log.info(
+      `Extracting ${batchLabel}/${batches.length} (${batch.length} pages) for ${platform}`
     );
 
     try {
-      const jobs = await extractBatch(client, batch);
+      const jobs = await extractBatch(client, batch, platform, batchLabel);
       allJobs.push(...jobs);
     } catch (err) {
-      console.error(
-        `  Failed to extract batch ${i + 1} for ${platform}: ${err instanceof Error ? err.message : err}`
+      log.error(
+        `Failed to extract ${batchLabel} for ${platform}: ${err instanceof Error ? err.message : err}`
       );
     }
   }
