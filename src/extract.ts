@@ -26,9 +26,7 @@ async function extractBatch(
   batch: ScrapedPage[]
 ): Promise<RawJob[]> {
   const pagesContent = batch
-    .map(
-      (p, i) => `--- Page ${i + 1}: ${p.url} ---\n${p.markdown.slice(0, 8000)}`
-    )
+    .map((p, i) => `--- Page ${i + 1}: ${p.url} ---\n${p.markdown}`)
     .join("\n\n");
 
   const response = await client.messages.create({

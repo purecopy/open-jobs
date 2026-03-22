@@ -54,6 +54,29 @@ async function crawlPlatform(
   const jobs = await extractJobs(pages, platform.id);
   console.log(`  Extracted ${jobs.length} job(s) from ${platform.id}`);
 
+  if (platform.id === "kulturkonzepte") {
+    console.log("  [kulturkonzepte-debug] Pages sent to extraction:");
+    for (const page of pages) {
+      console.log(
+        `    URL: ${page.url} | markdown preview: ${page.markdown.slice(0, 200).replace(/\n/g, " ")}`
+      );
+    }
+    console.log("  [kulturkonzepte-debug] Extracted jobs:");
+    for (const job of jobs) {
+      console.log(
+        `    "${job.title}" @ ${job.company} | url=${job.url} | deadline=${job.deadline}`
+      );
+    }
+    if (jobs.length === 0) {
+      console.log(
+        "  [kulturkonzepte-debug] No jobs extracted! Full markdown of first page:"
+      );
+      if (pages[0]) {
+        console.log(pages[0].markdown.slice(0, 3000));
+      }
+    }
+  }
+
   const result = await dedup(jobs, platform.id);
 
   for (const job of jobs) {

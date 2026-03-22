@@ -20,7 +20,7 @@ export const platforms: Platform[] = [
     url: "https://kulturkonzepte.at/service/jobboerse/",
     type: "aggregator",
     crawlScope: {
-      includePaths: ["/service/jobboerse/.*"],
+      includePaths: ["/job/.*"],
       limit: 50,
     },
   },
