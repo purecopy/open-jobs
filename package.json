@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "check": "ultracite check",
     "fix": "ultracite fix",
-    "prepare": "lefthook install"
+    "prepare": "lefthook install",
+    "doctor": "ultracite doctor"
   },
   "keywords": [],
   "author": "",

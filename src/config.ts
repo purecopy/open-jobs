@@ -53,7 +53,7 @@ export function getConfig(): Config {
       cloudflareApiToken: requireEnv("CLOUDFLARE_API_TOKEN"),
       d1DatabaseId: requireEnv("CLOUDFLARE_D1_DATABASE_ID"),
       relevanceThreshold: Number.parseInt(
-        process.env.RELEVANCE_THRESHOLD || "3",
+        process.env.RELEVANCE_THRESHOLD || "2",
         10
       ),
       profile: loadProfile(),

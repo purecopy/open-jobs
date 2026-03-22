@@ -19,7 +19,7 @@ function formatJob(job: Job): string {
       : ` · ${job.employment_type.charAt(0).toUpperCase() + job.employment_type.slice(1)}`;
 
   return [
-    `⭐ ${job.relevance_score}/10 · ${flag}`,
+    `⭐ ${job.relevance_score}/5 · ${flag}`,
     title,
     job.company,
     `📍 ${job.location || "Location not specified"}${type}`,

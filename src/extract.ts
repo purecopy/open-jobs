@@ -14,13 +14,13 @@ const BATCH_SIZE = 5;
 
 const RawJobSchema = z.object({
   company: z.string(),
-  deadline: z.string(),
+  deadline: z.string().nullable(),
   description: z.string(),
-  employment_type: z.string(),
+  employment_type: z.enum(["full-time", "part-time", "unknown"]),
   language_required: z.string(),
   location: z.string(),
-  posted_at: z.string(),
-  salary: z.string(),
+  posted_at: z.string().nullable(),
+  salary: z.string().nullable(),
   title: z.string(),
   title_en: z.string(),
   url: z.string(),
@@ -48,27 +48,33 @@ async function extractBatch(
     pagesContent
   );
 
+  const today = new Date().toISOString().split("T")[0];
+
   const response = await client.messages.parse({
     model: MODEL,
-    max_tokens: 4096,
+    max_tokens: 16_384,
+    system:
+      "You are a structured data extractor. Extract job listings from scraped web pages into the requested JSON format. Be precise and consistent. Do not invent information that is not present on the page.",
     messages: [
       {
         role: "user",
-        content: `Extract all job listings from the following scraped web pages. For each job, return a JSON object with these fields:
+        content: `Extract all job listings from the following scraped web pages. Today's date is ${today}.
 
-- title: Original job title as written
-- title_en: English translation of the title
+For each job, return a JSON object with these fields:
+
+- title: Original job title exactly as written on the page
+- title_en: English translation of the title. If the title is already in English, repeat it as-is
 - company: Organization/company name
-- url: Direct link to the job listing
+- url: Direct link to the job listing. If no direct link exists, use the page URL from the header (e.g. "Page 1: <url>")
 - location: Location as stated (city, region)
 - employment_type: "full-time", "part-time", or "unknown"
 - language_required: e.g. "Deutsch C1", "English ok", "unclear" — be specific about what the listing states
-- description: 2-3 sentence summary of the role
-- salary: If mentioned, otherwise ""
-- deadline: Application deadline in ISO 8601 format if stated, otherwise "". If the page says the deadline has passed, the listing is closed, expired, or no longer accepting applications, set deadline to "expired".
-- posted_at: Posting date in ISO 8601 format if visible, otherwise ""
+- description: 2-3 sentence summary covering the role's main responsibilities and requirements
+- salary: Salary or pay range if mentioned, otherwise null
+- deadline: Application deadline in ISO 8601 format if stated, otherwise null. If the deadline is in the past relative to today (${today}), or the listing says it is closed/expired/no longer accepting applications, set to "expired"
+- posted_at: Posting date in ISO 8601 format if visible, otherwise null
 
-If the listing language requirements are unclear, mark as "unclear".
+If the listing language requirements are unclear, mark language_required as "unclear".
 If a page contains no job listings, skip it.
 If a listing is clearly expired or closed, still extract it but set deadline to "expired".
 

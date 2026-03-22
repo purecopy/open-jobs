@@ -32,9 +32,9 @@ export async function dedup(
       employment_type: job.employment_type,
       language_required: job.language_required,
       description: job.description,
-      salary: job.salary,
-      deadline: job.deadline,
-      posted_at: job.posted_at,
+      salary: job.salary ?? "",
+      deadline: job.deadline ?? "",
+      posted_at: job.posted_at ?? "",
       crawled_at: new Date().toISOString(),
     });
 

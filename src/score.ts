@@ -1,7 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
-import { getConfig } from "./config.js";
+import { getConfig, type Profile } from "./config.js";
 import {
   expireJobs,
   getUnscoredJobs,
@@ -14,14 +14,14 @@ import { chunk } from "./utils/chunk.js";
 
 const log = createLogger("score");
 
-const MODEL = "claude-opus-4-6";
-const BATCH_SIZE = 10;
+const MODEL = "claude-sonnet-4-6";
+const BATCH_SIZE = 5;
 
 const ScoredJobSchema = z.object({
-  id: z.number(),
+  id: z.number().int(),
   language_flag: z.enum(["green", "yellow", "red"]),
   relevance_reason: z.string(),
-  relevance_score: z.number(),
+  relevance_score: z.number().int().min(1).max(5),
 });
 
 const ScoringResultSchema = z.object({
@@ -32,43 +32,72 @@ type ScoredJob = z.infer<typeof ScoredJobSchema>;
 
 type UnscoredJob = Awaited<ReturnType<typeof getUnscoredJobs>>[number];
 
+function buildScoringRubric(profile: Profile): string {
+  const roles = profile.roles.slice(0, 4).join(", ");
+  const locations = profile.location.preferred.join("/");
+
+  return `Scoring scale (1-5):
+- 5: Strong match — role closely aligns with candidate's target roles (${roles}); location is ${locations} or remote; no dealbreakers
+- 4: Good match — related role in candidate's field; minor gaps in fit (e.g. language situation unclear, slightly outside core expertise)
+- 3: Partial match — tangentially relevant to candidate's strengths, or good role but likely blocked by a soft constraint
+- 2: Weak match — role is adjacent but significant gaps (wrong field, missing key skills, or hard language barrier)
+- 1: Poor match — unrelated to candidate's profile or a dealbreaker is present`;
+}
+
 async function scoreBatch(
   client: Anthropic,
   profileJson: string,
+  rubric: string,
   batch: UnscoredJob[]
 ): Promise<ScoredJob[]> {
-  const jobsList = batch
-    .map(
-      (j) =>
-        `[ID: ${j.id}] "${j.title}" at ${j.company} | Location: ${j.location} | Type: ${j.employment_type} | Language: ${j.language_required} | Description: ${j.description}`
-    )
-    .join("\n");
+  const jobsList = JSON.stringify(
+    batch.map((job) => ({
+      id: job.id,
+      title: job.title,
+      company: job.company,
+      location: job.location,
+      employment_type: job.employment_type,
+      language_required: job.language_required,
+      description: job.description,
+    })),
+    null,
+    2
+  );
 
   const response = await client.messages.parse({
     model: MODEL,
     max_tokens: 4096,
+    system:
+      "You score job listings for relevance to a specific candidate. Be calibrated: most jobs should score 2-3. Reserve 5 for excellent matches and 1 for clear mismatches.",
     messages: [
       {
         role: "user",
-        content: `You are scoring job listings for relevance to a specific candidate. Here is their profile:
+        content: `Score these job listings for the following candidate.
+
+## Candidate Profile
 
 ${profileJson}
 
-Scoring guidance:
-- 9-10: Strong match — curatorial, mediation, sound/media art, or comms role; English-friendly; Wien/NÖ
-- 7-8: Good match — related cultural role; language situation manageable or unclear
-- 5-6: Partial match — tangentially relevant, or good role but German likely needed
-- 3-4: Weak match — role is adjacent but significant gaps (wrong field, hard German requirement)
-- 1-2: Poor match — unrelated or dealbreaker present
+## ${rubric}
 
-Language flag (independent of score):
+Language flag (classify independently from score):
 - "green": English ok / no German needed / international workplace
 - "yellow": Some German helpful, A2-B1 might suffice
 - "red": Fluent German (C1+) explicitly required
 
-For each job, return an object with: id, relevance_score (1-10), relevance_reason (one sentence, English), language_flag ("green"/"yellow"/"red").
+## Examples
 
-Jobs to score:
+[ID: 0] "Kuratorische Assistenz (m/w/d)" at Kunsthalle Wien | Location: Wien | Language: English ok, Deutsch B1 helpful
+→ relevance_score: 5, language_flag: "green", relevance_reason: "Curatorial assistant at a major Vienna institution with English-friendly policy — direct match for core target role."
+
+[ID: 0] "Buchhaltung / Office Management" at Tanzquartier Wien | Location: Wien | Language: Deutsch C1 erforderlich
+→ relevance_score: 1, language_flag: "red", relevance_reason: "Accounting/office role requires skills outside candidate's profile and fluent German."
+
+[ID: 0] "Projektkoordination Kulturprogramm" at Stadt Linz | Location: Linz | Language: Deutsch C1
+→ relevance_score: 2, language_flag: "red", relevance_reason: "Relevant cultural coordination role but located outside preferred area and requires fluent German."
+
+## Jobs to score
+
 ${jobsList}`,
       },
     ],
@@ -101,6 +130,7 @@ export async function scoreJobs(): Promise<ScoreResult> {
 
   const client = getAnthropicClient();
   const profileJson = JSON.stringify(config.profile, null, 2);
+  const rubric = buildScoringRubric(config.profile);
 
   let totalScored = 0;
   const batches = chunk(jobs, BATCH_SIZE);
@@ -109,7 +139,8 @@ export async function scoreJobs(): Promise<ScoreResult> {
     log.info(`Scoring batch ${i + 1}/${batches.length} (${batch.length} jobs)`);
 
     try {
-      const scored = await scoreBatch(client, profileJson, batch);
+      const scored = await scoreBatch(client, profileJson, rubric, batch);
+
       for (const s of scored) {
         await updateScore(
           s.id,
